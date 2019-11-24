@@ -5,28 +5,25 @@ module CordicAtan_TB;
 reg clk;
 reg rst_n;
 
-reg en;
+
+reg signed [31:0] x;
+reg signed [31:0] y;
 
 
-
-reg signed [15:0] x;
-reg signed [15:0] y;
-
-
-wire [15:0] out_atan;
+wire [31:0] atan;
 
 CORDIC #(
-		.DATA_WIDTH(16),
-		.CYCLES(3) 
+		.DATA_WIDTH(32),
+		.EXPAND_BIT(16),
+		.CYCLES(5) 
 )u_CORDIC(
 		.clk(clk), 
 		.rst_n(rst_n), 
-		.en(en), 
 		
 		.x(x), 
 		.y(y), 
 		
-		.out_atan(out_atan)
+		.atan(atan)
 ); 
 
 initial begin
@@ -47,9 +44,8 @@ endtask
 
 task task_sysinit;
 begin
-	en <= 0;
-	x <= 16'd100;
-	y <= 16'd20;
+	x <= 32'd655360;
+	y <= -32'd1310720;
 end
 endtask
 

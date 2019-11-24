@@ -10,19 +10,29 @@
 //V1.0		Verdvana		Verdvana		Verdvana		  			2019-11-23
 //
 //-----------------------------------------------------------------------------------
+//
+//Version	Modified History
+//V1.0		输入第一象限直角坐标，通过最高8次迭代，求出反正切角，精度为1°。
+//
+//V1.1		输入的坐标扩大到四个象限，并且为了提高精度需要提前左移N位，这样得出的结果也是左移N位的。
+//				迭代次数最高24次。
+//				精度<0.05°
+//				求出的角度范围为0-360°。
+//-----------------------------------------------------------------------------------
 
 
 module CordicAtan #(
-		parameter 	DATA_WIDTH = 16,					//输入数据宽度
-						CYCLES	  = 3  					//迭代次数：最多迭代2**CYCLES次
+		parameter 	DATA_WIDTH = 32,					//输入数据宽度
+						EXPAND_BIT = 16,					//输入放大左移位数
+						CYCLES	  = 5  					//迭代次数：最多迭代2**CYCLES次
 )(
 		input 									clk, 		//时钟
 		input 									rst_n, 	//异步复位
-		input 									en, 		//使能
 		
 		input signed  [DATA_WIDTH-1:0]	x, y, 	//输入坐标（有符号）
 		
-		output signed [DATA_WIDTH-1:0] 	out_atan	//求得反正切值
+		output									valid,	//输出有效
+		output        [DATA_WIDTH-1:0] 	atan		//求得反正切值
 ); 
 
 
@@ -47,9 +57,12 @@ module CordicAtan #(
 	//=====================================================
 	//迭代循环
 	
-	reg signed [DATA_WIDTH-1:0]	x_cycles, y_cycles;	//迭代中间变量
-	reg  [DATA_WIDTH-1:0]			z;							//旋转角度
-	wire [DATA_NUM-1:0] 				z_w;						//ROM中角度数据
+	reg signed  [DATA_WIDTH-1:0]	x_cycles, y_cycles;	//迭代中间变量寄存器
+	reg         [DATA_WIDTH-1:0]	z;							//旋转角度寄存器
+	reg									valid_r;					//输出有效寄存器
+	
+	wire        [DATA_WIDTH-1:0] 	z_w;						//ROM中角度数据
+
 	
 	always_ff@(posedge clk or negedge rst_n) begin
 	
@@ -58,6 +71,7 @@ module CordicAtan #(
 			x_cycles <= '0;
 			y_cycles <= '0;
 			z			<= 0;
+			valid_r  <= 0;
 			
 		end
 		
@@ -65,9 +79,43 @@ module CordicAtan #(
 		
 			if(cnt_cycles=='0) begin			//第0个循环，输入数据初始化
 				
-				x_cycles <= x;
-				y_cycles <= y;
-				z			<= '0 ;
+				case ({x[DATA_WIDTH-1],y[DATA_WIDTH-1]})		//判断象限
+				
+					2'b00: begin										//1象限
+					
+								x_cycles <= x;
+								y_cycles <= y;
+								z			<= '0;
+								
+					end
+					
+					2'b10: begin										//2象限
+					
+								x_cycles <= y;
+								y_cycles <= -x;
+								z			<= (90 << (EXPAND_BIT)) ;
+					
+					end
+					
+					2'b11: begin										//3象限
+					
+								x_cycles <= -x;
+								y_cycles <= -y;
+								z			<= (180 << (EXPAND_BIT)) ;
+					
+					end
+					
+					2'b01: begin										//4象限
+					
+								x_cycles <= -y;
+								y_cycles <= x;
+								z			<= (270 << (EXPAND_BIT)) ;
+					
+					end
+					
+				endcase	
+		
+				valid_r  <= 0;
 			
 			end
 			
@@ -78,6 +126,7 @@ module CordicAtan #(
 					x_cycles <= x_cycles;
 					y_cycles <= y_cycles;
 					z			<= z ;
+					valid_r  <= 1;
 				
 				end
 			
@@ -106,8 +155,8 @@ module CordicAtan #(
 	
 	//======================================================
 	//反正切角度输出
-	
-	assign out_atan = z;
+	assign valid = valid_r;				//输出有效
+	assign atan = valid_r ? z : 'z;	//反正切角
 	
 	//======================================================
 	//Intel 1-Port ROM 
